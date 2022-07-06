@@ -1,72 +1,13 @@
-from . import schools
+
+from . import r_profiles
+from . import r_student
+
 from typing import Union, Dict, List, Type
 import math
+import random
 import numpy as np
 import pandas as pd
 
-
-
-class Student(schools.Student):
-    """Student, that can be compared to profiles (compare score: less - better)"""
-
-    def __call__(self, *args, **kwargs):
-        return self.compare(*args, **kwargs)
-
-    def compare(self, profile: np.ndarray, attr: str):
-        options = {
-            "school_type": self.compare_school_type,
-            "mature_scores": self.compare_mature_scores,
-            "extended_subjects": self.compare_extended_subjects,
-            "compare_points": self.compare_points,
-        }
-
-        return options[attr](profile)
-
-    def compare_school_type(self, profile: np.ndarray):
-        """Compare school type to desired school type of the student, less - better"""
-
-        return abs(self.school_type - profile[0])
-
-    def compare_mature_scores(self, profile: np.ndarray):
-        """Compare mature scores to student's exam results (probably won't gonna work well), less - better"""
-
-        return abs(self.exam_results - profile[1]).mean()
-
-    def compare_extended_subjects(self, profile: np.ndarray):
-        """Compare extended subjects to subjects liked by a student, less - better"""
-
-        return 1 / (1 + (self.liked_subjects * profile[2]).sum())
-
-    def compare_points(self, profile: np.ndarray):
-        """Compare student's and profile's points, less - better"""
-
-        points_for_profile = self.calculate_points(profile)
-
-        if profile[3][0] > points_for_profile:
-            # comparing to minimum profile points
-
-            return abs(profile[3][0] - points_for_profile),
-
-        else:
-            # comparing to average profile points
-
-            return abs(profile[3][1] - points_for_profile)
-
-    @classmethod
-    def from_existing_student(cls, student: schools.Student):
-        """Create comparable student from schools.Student class"""
-
-        assert isinstance(student, schools.Student)
-
-        return cls(
-            exam_results=student.exam_results,
-            grades=student.grades,
-            liked_subjects=student.liked_subjects,
-            location=student.location,
-            weights_table=student.weights_table,
-            school_type=student.school_type,
-            additional_points=student.additional_points,
-        )
 
 
 class SchoolRecommendationModel:
@@ -80,11 +21,11 @@ class SchoolRecommendationModel:
     """
 
     profiles_df: pd.DataFrame
-    profiles: list[schools.Profile]
+    profiles: list[r_profiles.Profile]
 
     def __init__(
             self,
-            profiles: list[schools.Profile],
+            profiles: list[r_profiles.Profile],
             recommendation_attributes=None
     ):
         """
@@ -111,10 +52,10 @@ class SchoolRecommendationModel:
 
         self.recommendation_attributes = recommendation_attributes
 
-    def __call__(self, *args, **kwargs) -> list[schools.Profile]:
+    def __call__(self, *args, **kwargs) -> list[r_profiles.Profile]:
         return self.recommend(*args, **kwargs)
 
-    def __init_profiles_df(self, profiles: list[schools.Profile]):
+    def __init_profiles_df(self, profiles: list[r_profiles.Profile]):
         self.profiles_df = pd.DataFrame.from_dict(
             map(
                 lambda profile: np.append(profile.array, [[0]]),
@@ -122,7 +63,7 @@ class SchoolRecommendationModel:
             )
         )
 
-    def __compare(self, attr: str, student: Student):
+    def __compare(self, attr: str, student: r_student.ComparableStudent):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
 
         # calculate ranking of schools for specific attribute
@@ -135,13 +76,18 @@ class SchoolRecommendationModel:
             # add weighted ranking position to the last column of df row (needed to calculate average ranking index)
             self.profiles_df.at[i, self.profiles_df.columns[-1]] += in_ranking * self.recommendation_attributes[attr]
 
-    def recommend(self, student: Union[schools.Student, Student], n=None) -> list[schools.Profile]:
+    def recommend(
+            self,
+            student: Union[r_student.Student, r_student.ComparableStudent],
+            n=None
+    ) -> list[r_profiles.Profile]:
         """Recommends schools for specific student"""
 
+        random.shuffle(self.profiles)
         self.__init_profiles_df(self.profiles)
 
-        if type(student) is type(schools.Student):
-            student = Student.from_existing_student(student)
+        if type(student) is type(r_student.Student):
+            student = r_student.ComparableStudent.from_existing_student(student)
 
         for attr in self.recommendation_attributes:
             self.__compare(attr, student)
