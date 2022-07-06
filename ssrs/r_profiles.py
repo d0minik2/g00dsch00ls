@@ -1,6 +1,6 @@
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8 -*-
 
-from .school_poperties import *
+from .config import *
 
 from typing import Union, Dict, List, Type
 import json
@@ -68,7 +68,7 @@ class School:
     location: str = ""
     mature_scores: Union[list[float], dict] = field(default_factory=list)
     profiles: list = field(default_factory=list)
-    __array = None
+    _array = None
 
     def __post_init__(self):
         # setting school type to a number
@@ -131,7 +131,7 @@ class Profile:
     minimum_points: float = MIN_POINTS
     average_points: float = (MAX_POINTS-MIN_POINTS)/2
     maximum_points: float = MAX_POINTS
-    __array = None
+    _array = None
 
     def __post_init__(self):
         self.extended_subjects_list = self.extended_subjects
@@ -144,17 +144,18 @@ class Profile:
     def array(self) -> np.ndarray:
         """Return an array that can be compared with student"""
 
-        if self.__array is None:
-            self.__array = np.array([
+        if self._array is None:
+            self._array = np.array([
                 self.school.school_type,
                 self.school.mature_scores,
                 self.extended_subjects,
                 [self.minimum_points, self.average_points, self.maximum_points],
                 self.scored_subjects,
+                #
                 # TODO self.school.location
             ], dtype=object)
 
-        return self.__array
+        return self._array
 
     @classmethod
     def from_dict(cls, proflie: dict, school: School = None):
