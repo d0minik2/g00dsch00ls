@@ -6,8 +6,7 @@ import numpy as np
 from dataclasses import dataclass, field
 
 
-
-SUBJECTS = ['historia', 'j?zyk angielski', 'j?zyk polski', 'matematyka', 'historia', 'wos', 'biologia', 'geografia', 'biologia', 'geografia', 'informatyka', 'chemia', 'biologiachemia', 'fizyka', 'wos', 'j?zyk ?aci?ski', 'j?zyk obcy', 'geografiawos', 'historia sztuki', 'j?zyk niemiecki', 'chemiageografia', 'geografia', 'historia', 'historia(proponowany)', 'historia sztuki (proponowany)', 'wos (proponowany)', 'j?zyk angielskij?zyk hiszpa?skij?zyk niemiecki', 'j?zyk hiszpa?ski', 'j?zyk w?oski', 'j?zyk francuskij?zyk hiszpa?skij?zyk niemieckij?zyk rosyjskij?zyk w?oski', 'historiaj?zyk obcyplastykawos', 'biologiahistoriaj?zyk obcywos', 'biologiachemiaj?zyk obcy', 'biologiageografiaj?zyk obcywf', 'geografiaj?zyk obcywos', 'chemiafizykainformatykaj?zyk obcy', 'j?zyk niemiecki (proponowany)', 'j?zyk w?oski (proponowany)', 'biologiahistoriawos', 'geografiainformatykawos', 'biologiachemiaj?zyk angielski', 'geografiaj?zyk obcy', 'j?zyk angielskiwos', 'fizykainformatyka', 'j?zyk francuski', 'geografiaj?zyk angielski', 'historiaj?zyk angielskiwos', 'j?zyk angielskij?zyk niemiecki', 'geografiainformatyka', 'biologiageografiaj?zyk angielski', 'wf', 'j?zyk angielski', 'j?zyk hiszpa?ski', 'j?zyk niemiecki', 'wos', 'biologia', 'fizyka', 'technika', 'biologia', 'chemia', 'edukacja dla bezpiecze?stwafizykageografiahistoriainformatykaj?zyk obcymuzykaplastykaprzyrodatechnikawfwos', 'plastyka', 'geografiainformatykaj?zyk niemiecki', 'biologiaj?zyk angielskij?zyk francuski', 'geografiainformatykamuzyka']
+SUBJECTS = ['historia', 'j?zyk angielski', 'j?zyk polski', 'matematyka', 'historiawos', 'biologia', 'geografia', 'biologiageografia', 'informatyka', 'chemia', 'biologiachemia', 'fizyka', 'wos', 'j?zyk ?aci?ski', 'j?zyk obcy', 'geografiawos', 'historia sztuki', 'j?zyk niemiecki', 'chemiageografia', 'geografiahistoria', 'j?zyk angielskij?zyk hiszpa?skij?zyk niemiecki', 'j?zyk hiszpa?ski', 'j?zyk w?oski', 'j?zyk francuskij?zyk hiszpa?skij?zyk niemieckij?zyk rosyjskij?zyk w?oski', 'historiaj?zyk obcyplastykawos', 'biologiahistoriaj?zyk obcywos', 'biologiachemiaj?zyk obcy', 'biologiageografiaj?zyk obcywf', 'geografiaj?zyk obcywos', 'chemiafizykainformatykaj?zyk obcy', 'biologiahistoriawos', 'geografiainformatykawos', 'biologiachemiaj?zyk angielski', 'geografiaj?zyk obcy', 'j?zyk angielskiwos', 'fizykainformatyka', 'j?zyk francuski', 'geografiaj?zyk angielski', 'historiaj?zyk angielskiwos', 'j?zyk angielskij?zyk niemiecki', 'geografiainformatyka', 'biologiageografiaj?zyk angielski', 'wf', 'j?zyk angielskij?zyk hiszpa?skij?zyk niemieckiwos', 'biologiafizyka', 'technika', 'biologiachemiaedukacja dla bezpiecze?stwafizykageografiahistoriainformatykaj?zyk obcymuzykaplastykaprzyrodatechnikawfwos', 'plastyka', '', 'j', 'geografiainformatykaj?zyk niemiecki', 'biologiaj?zyk angielskij?zyk francuski', 'geografiainformatykamuzyka']
 SCHOOL_TYPES = {
     "liceum / publiczna": 0,
     "liceum / niepubliczna": 0,
@@ -58,6 +57,8 @@ def map_subjects(subjects: Union[List[str], Dict]) -> np.ndarray:
         for subj in subjects:
             if subj in SUBJECTS:
                 array[SUBJECTS.index(subj)] = 1
+            elif subj.replace("\t", "") in SUBJECTS:
+                array[SUBJECTS.index(subj.replace("\t", ""))] = 1
 
     elif isinstance(subjects, dict):
         # setting values in array to values from dict in indexes of subjects
@@ -201,12 +202,15 @@ class Profile:
     school: School
     extended_subjects: Union[List[str], np.ndarray]
     scored_subjects: Union[List[str], np.ndarray]
+    extended_subjects_list = None
     minimum_points: float = MIN_POINTS
     average_points: float = (MAX_POINTS-MIN_POINTS)/2
     maximum_points: float = MAX_POINTS
     __array = None
 
     def __post_init__(self):
+        self.extended_subjects_list = self.extended_subjects
+
         # mapping subjects to arrays
         self.extended_subjects = map_subjects(self.extended_subjects)
         self.scored_subjects = map_subjects(self.scored_subjects)
