@@ -11,13 +11,25 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Student:
-    """Student attributes class"""
+    """Student attributes class
+
+    Parameters
+    ----------
+
+    exam_results: dict[str: float] or np.ndarray - results of exams
+    liked_subjects: list[str] or dict[str: float] - subjects that student likes
+    grades: list[str] or dict[str: float] - grades that student scored
+    additional_points: float - additional points that student scored (for achievements, volunteering, etc.)
+    attributes_perferences: dict[str: float] - student's recommendation attributes preferences
+    location: str - student's address
+    school_type: int - student's school type (0 - liceum, 1 - techinkum, 2 - szkoła zawodowa)
+    """
 
     exam_results: Union[Dict[str, float], np.ndarray]
     grades: Union[Dict[str, int], np.ndarray]
     liked_subjects: Union[List, np.ndarray]
     location: str = ""
-    weights_table: np.ndarray = np.array([])
+    attributes_preferences: dict = field(default_factory=dict)
     school_type: int = 1  # desired student's school type
     additional_points: int = 0  # points for achievements, volunteering, etc.
     _base_points = 0
@@ -28,7 +40,9 @@ class Student:
         self.liked_subjects = r_profiles.map_subjects(self.liked_subjects)
         self.grades = r_profiles.map_subjects(self.grades)
         self._calculate_base_points()
-        self.exam_results = np.array(list(self.exam_results.values()))
+
+        if not isinstance(self.exam_results, np.ndarray):
+            self.exam_results = np.array(list(self.exam_results.values()))
 
         # calculating points for grades that will be used when calculating points for profiles
         self._subject_points = np.vectorize(r_profiles.calculate_grade_points)(self.grades)
@@ -42,10 +56,19 @@ class Student:
         if self.grades[MIN_GRADE <= self.grades].mean() >= DIPLOMA_HONORS_GPA:
             self._base_points += DIPLOMA_HONORS_POINTS
 
-        # adding points for exams
-        self._base_points += POLISH_EXAM_WEIGHT * self.exam_results["polish"]
-        self._base_points += MATH_EXAM_WEIGHT * self.exam_results["math"]
-        self._base_points += ENGLISH_EXAM_WEIGHT * self.exam_results["english"]
+        if isinstance(self.exam_results, dict):
+            # if exam results are in dict, adding points for each exam result
+
+            self._base_points += POLISH_EXAM_WEIGHT * self.exam_results["polish"]
+            self._base_points += MATH_EXAM_WEIGHT * self.exam_results["math"]
+            self._base_points += ENGLISH_EXAM_WEIGHT * self.exam_results["english"]
+
+        else:
+            # if exam results are in array, adding points for each exam result
+
+            self._base_points += POLISH_EXAM_WEIGHT * self.exam_results[0]
+            self._base_points += MATH_EXAM_WEIGHT * self.exam_results[1]
+            self._base_points += ENGLISH_EXAM_WEIGHT * self.exam_results[2]
 
         self._base_points += self.additional_points
 
@@ -143,7 +166,7 @@ class ComparableStudent(Student):
             grades=student.grades,
             liked_subjects=student.liked_subjects,
             location=student.location,
-            weights_table=student.weights_table,
+            attributes_preferences=student.attributes_preferences,
             school_type=student.school_type,
             additional_points=student.additional_points,
         )

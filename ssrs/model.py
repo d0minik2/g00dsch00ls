@@ -79,33 +79,39 @@ class Model:
             )
         )
 
+    def _compare_by_ranking(self, attr: str, student: r_student.ComparableStudent):
+        # calculate ranking of schools for specific attribute
+        recommendation_ranking = sorted(
+            list(range(len(self.profiles_df))),
+            key=lambda profile_idx: student.compare(
+                self.profiles_df.values[profile_idx], attr
+            )
+        )
+
+        for in_ranking, i in enumerate(recommendation_ranking):
+            # add weighted ranking position to the last column of df row (needed to calculate average ranking index)
+            self.profiles_df.at[i, self.profiles_df.columns[-1]] += \
+                in_ranking * self.recommendation_attributes[attr] * student.attributes_preferences.get(attr, 1)
+
+    def _compare_by_normalization(self, attr: str, student: r_student.ComparableStudent):
+        # compare student and profile attributes
+        compared = self.profiles_df.apply(
+            lambda profile: student.compare(profile, attr),
+            axis=1
+        ).to_numpy(dtype=np.float64)
+
+        # add weighted normalized score to the last column of df (needed to calculate average later)
+        self.profiles_df[self.profiles_df.columns[-1]] += \
+            zscore_normalize(compared) * self.recommendation_attributes[attr] * student.attributes_preferences.get(attr, 1)
+
     def _compare(self, attr: str, student: r_student.ComparableStudent):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
 
         if self.mode == RANKING_MODE:
-            # calculate ranking of schools for specific attribute
-            recommendation_ranking = sorted(
-                list(range(len(self.profiles_df))),
-                key=lambda profile_idx: student.compare(
-                    self.profiles_df.values[profile_idx], attr
-                )
-            )
-
-            for in_ranking, i in enumerate(recommendation_ranking):
-                # add weighted ranking position to the last column of df row (needed to calculate average ranking index)
-                self.profiles_df.at[i, self.profiles_df.columns[-1]] += \
-                    in_ranking * self.recommendation_attributes[attr]
+            self._compare_by_ranking(attr, student)
 
         elif self.mode == NORMALIZATION_MODE:
-            # compare student and profile attributes
-            compared = self.profiles_df.apply(
-                lambda profile: student.compare(profile, attr),
-                axis=1
-            ).to_numpy(dtype=np.float64)
-
-            # add weighted normalized score to the last column of df (needed to calculate average later)
-            self.profiles_df[self.profiles_df.columns[-1]] += \
-                zscore_normalize(compared) * self.recommendation_attributes[attr]
+            self._compare_by_normalization(attr, student)
 
     def recommend(
             self,
@@ -137,6 +143,7 @@ class Model:
         # yield top n schools
         for i in recommendation_ranking[:n]:
             yield self.profiles[i]
+
 
 
 def zscore_normalize(values: Union[List, np.ndarray]) -> Union[List, np.ndarray]:
