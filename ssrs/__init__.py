@@ -1,13 +1,15 @@
-from .model import Model
-from .r_profiles import Profile, School, generate_profiles
-from .r_student import ComparableStudent, Student
+from .model import SchoolRecommendationModel, RANKING_MODE, NORMALIZATION_MODE
+from ._profiles import Profile, School, generate_profiles
+from ._student import ComparableStudent, Student
 
 
 __all__ = [
-    "Model",
+    "SchoolRecommendationModel",
     "Profile",
     "School",
     "ComparableStudent",
     "Student",
-    "generate_profiles"
+    "generate_profiles",
+    "RANKING_MODE",
+    "NORMALIZATION_MODE"
 ]

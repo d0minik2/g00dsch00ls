@@ -1,5 +1,5 @@
 
-from . import r_profiles
+from . import _profiles
 from .config import *
 
 from typing import Union, Dict, List, Type
@@ -37,15 +37,15 @@ class Student:
 
     def __post_init__(self):
         # mapping subjects to arrays
-        self.liked_subjects = r_profiles.map_subjects(self.liked_subjects)
-        self.grades = r_profiles.map_subjects(self.grades)
+        self.liked_subjects = _profiles.map_subjects(self.liked_subjects)
+        self.grades = _profiles.map_subjects(self.grades)
         self._calculate_base_points()
 
         if not isinstance(self.exam_results, np.ndarray):
             self.exam_results = np.array(list(self.exam_results.values()))
 
         # calculating points for grades that will be used when calculating points for profiles
-        self._subject_points = np.vectorize(r_profiles.calculate_grade_points)(self.grades)
+        self._subject_points = np.vectorize(_profiles.calculate_grade_points)(self.grades)
 
         # TODO set location to jakdojade object (if i get an API access)
 
@@ -83,7 +83,7 @@ class Student:
 
             points_for_subjects = (profile[4] * self._subject_points).sum()
 
-        elif isinstance(profile, r_profiles.Profile):
+        elif isinstance(profile, _profiles.Profile):
             points_for_subjects = (profile.scored_subjects * self._subject_points).sum()
 
         return self._base_points + points_for_subjects

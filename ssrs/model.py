@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from . import r_profiles
-from . import r_student
+from . import _profiles
+from . import _student
+from . import r_systems
 
 from typing import Union, Dict, List, Type
 import math
@@ -12,23 +13,33 @@ import pandas as pd
 
 
 
-RANKING_MODE = 0
-NORMALIZATION_MODE = 1
+RANKING_MODE = 1
+NORMALIZATION_MODE = 2
+
+MODES = {
+    RANKING_MODE: r_systems.RankingSystem,
+    NORMALIZATION_MODE: r_systems.NormalizationSystem
+}
 
 
 
-class Model:
+class SchoolRecommendationModel:
     """Recommendation System for schools
     Calculates school ranking based on student preferences.
     Call that model with student object and number of schools to recommend to get recommended schools.
 
-    Modes
-    -----
+    Modes (systems)
+    ---------------
+
+    You can use multiple recommendation systems in one model, by using binary numbers to specify which systems to use
+    (sum numbers of systems to get system combination). For example, if you want to use both ranking (1) and
+    normalization (2) systems, you can use mode 3 (ranking + normalization), if you want to use only ranking system,
+    you can use mode 1 (ranking). Recommendation of multiple systems is done by averaging rankings of each system.
 
     Two modes are available:
-    - RANKING_MODE: (0) recommendations are calculated by comparing student and profile attributes,
+    - RANKING_MODE: (1) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes ranking of best options and combines them into one ranking of best recommendations.
-    - NORMALIZATION_MODE: (1) recommendations are calculated by comparing student and profile attributes,
+    - NORMALIZATION_MODE: (2) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes normalized score and combines them into one recommendation ranking.
 
     Parameters
@@ -40,15 +51,19 @@ class Model:
     """
 
     profiles_df: pd.DataFrame
-    profiles: list[r_profiles.Profile]
+    profiles: list[_profiles.Profile]
+    systems: list[r_systems.RecommendationSystem]
 
     def __init__(
             self,
-            profiles: list[r_profiles.Profile],
+            profiles: list[_profiles.Profile],
             recommendation_attributes=None,
             mode=RANKING_MODE
     ):
         self.profiles = profiles
+        self.mode = mode
+
+        self._init_systems(self.mode)
         self._init_profiles_df(self.profiles)
 
         if recommendation_attributes is None:
@@ -65,12 +80,11 @@ class Model:
             recommendation_attributes = {attr: 1 for attr in recommendation_attributes}
 
         self.recommendation_attributes = recommendation_attributes
-        self.mode = mode
 
-    def __call__(self, *args, **kwargs) -> list[r_profiles.Profile]:
+    def __call__(self, *args, **kwargs) -> list[_profiles.Profile]:
         return self.recommend(*args, **kwargs)
 
-    def _init_profiles_df(self, profiles: list[r_profiles.Profile]):
+    def _init_profiles_df(self, profiles: list[_profiles.Profile]):
         # create dataframe with profile attributes and last column for recommendation score
         self.profiles_df = pd.DataFrame.from_dict(
             map(
@@ -79,60 +93,47 @@ class Model:
             )
         )
 
-    def _compare_by_ranking(self, attr: str, student: r_student.ComparableStudent):
-        # calculate ranking of schools for specific attribute
-        recommendation_ranking = sorted(
-            list(range(len(self.profiles_df))),
-            key=lambda profile_idx: student.compare(
-                self.profiles_df.values[profile_idx], attr
-            )
-        )
+    def _init_systems(self, mode: int):
+        """Initialize recommendation systems"""
+
+        mode = bin(mode)
+        systems = [
+            MODES[2**i](self)
+            for i, m in enumerate(mode[2:][::-1])
+            if m == "1"
+        ]
+
+        self.systems = systems
+
+    def _compare(self, system: r_systems.RecommendationSystem, student: _student.ComparableStudent):
+        """Compute recommendation ranking for system"""
+
+        recommendation_ranking = system(student)
 
         for in_ranking, i in enumerate(recommendation_ranking):
-            # add weighted ranking position to the last column of df row (needed to calculate average ranking index)
-            self.profiles_df.at[i, self.profiles_df.columns[-1]] += \
-                in_ranking * self.recommendation_attributes[attr] * student.attributes_preferences.get(attr, 1)
-
-    def _compare_by_normalization(self, attr: str, student: r_student.ComparableStudent):
-        # compare student and profile attributes
-        compared = self.profiles_df.apply(
-            lambda profile: student.compare(profile, attr),
-            axis=1
-        ).to_numpy(dtype=np.float64)
-
-        # add weighted normalized score to the last column of df (needed to calculate average later)
-        self.profiles_df[self.profiles_df.columns[-1]] += \
-            zscore_normalize(compared) * self.recommendation_attributes[attr] * student.attributes_preferences.get(attr, 1)
-
-    def _compare(self, attr: str, student: r_student.ComparableStudent):
-        """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
-
-        if self.mode == RANKING_MODE:
-            self._compare_by_ranking(attr, student)
-
-        elif self.mode == NORMALIZATION_MODE:
-            self._compare_by_normalization(attr, student)
+            # add ranking position to the last column of df row (needed to calculate average ranking index)
+            self.profiles_df.at[i, self.profiles_df.columns[-1]] += in_ranking
 
     def recommend(
             self,
-            student: Union[r_student.Student, r_student.ComparableStudent],
+            student: Union[_student.Student, _student.ComparableStudent],
             n=None
-    ) -> list[r_profiles.Profile]:
+    ) -> list[_profiles.Profile]:
         """Recommends schools for specific student"""
 
         random.shuffle(self.profiles)
         self._init_profiles_df(self.profiles)
 
         # if Student is not ComparableStudent, convert it to ComparableStudent
-        if not isinstance(student, r_student.ComparableStudent) and isinstance(student, r_student.Student):
-            student = r_student.ComparableStudent.from_existing_student(student)
+        if not isinstance(student, _student.ComparableStudent) and isinstance(student, _student.Student):
+            student = _student.ComparableStudent.from_existing_student(student)
 
-        # for each attribute in recommendation sequence compute ranking
-        for attr in self.recommendation_attributes:
-            self._compare(attr, student)
+        # for each system in recommendation systems compute ranking
+        for system in self.systems:
+            self._compare(system, student)
 
         # calculate average recommendation score
-        self.profiles_df[self.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
+        self.profiles_df[self.profiles_df.columns[-1]] /= len(self.systems)
 
         # sort initial indexes by average score
         recommendation_ranking = sorted(
@@ -143,18 +144,3 @@ class Model:
         # yield top n schools
         for i in recommendation_ranking[:n]:
             yield self.profiles[i]
-
-
-
-def zscore_normalize(values: Union[List, np.ndarray]) -> Union[List, np.ndarray]:
-    """Normalize values to z-score."""
-
-    if isinstance(values, np.ndarray):
-        return (values - values.mean()) / np.std(values)
-
-    elif isinstance(values, list) or isinstance(values, tuple):
-        mean = sum(values) / len(values)
-        sum_of_differences = sum((value - mean) ** 2 for value in values)
-        standard_deviation = (sum_of_differences / (len(values) - 1)) ** .5
-
-        return [(value - mean) / standard_deviation for value in values]
