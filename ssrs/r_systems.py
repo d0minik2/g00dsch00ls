@@ -23,10 +23,10 @@ class RecommendationSystem:
     def __call__(self, *args, **kwargs):
         return self.recommend(*args, **kwargs)
 
-    def _compare(self, student: r_student.ComparableStudent):
+    def _compare(self, student: r_student.Student):
         """Compute recommendation scores for specific student"""
 
-    def recommend(self, student: r_student.ComparableStudent) -> list[r_profiles.Profile]:
+    def recommend(self, student: r_student.Student) -> list[r_profiles.Profile]:
         """Recommends schools for specific student"""
 
         self.scores = np.zeros(len(self.model.profiles))
@@ -47,19 +47,20 @@ class RecommendationSystem:
         return recommendation_ranking
 
 
+
 class RankingSystem(RecommendationSystem):
     """Recommendation System, which recommendations are calculated by comparing student and profile attributes,
         for each attribute computes ranking of best options and combines them into one ranking of best recommendations.
     """
 
-    def _compare(self, attr: str, student: r_student.ComparableStudent):
+    def _compare(self, attr: str, student: r_student.Student):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
 
         # calculate ranking of schools for specific attribute
         recommendation_ranking = sorted(
             list(range(len(self.model.profiles_df))),
-            key=lambda profile_idx: student.compare(
-                self.model.profiles_df.values[profile_idx], attr
+            key=lambda profile_idx: _student.StudentCalculator.compare(
+                student, self.model.profiles_df.values[profile_idx], attr
             )
         )
 
@@ -74,12 +75,12 @@ class NormalizationSystem(RecommendationSystem):
     """Recommendation System, which recommendations are calculated by comparing student and profile attributes,
         for each attribute computes normalized score and combines them into one recommendation ranking."""
 
-    def _compare(self, attr: str, student: r_student.ComparableStudent):
+    def _compare(self, attr: str, student: r_student.Student):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
 
         # compare student and profile attributes
         compared = self.model.profiles_df.apply(
-            lambda profile: student.compare(profile, attr),
+            lambda profile: _student.StudentCalculator.compare(student, profile, attr),
             axis=1
         ).to_numpy(dtype=np.float64)
 

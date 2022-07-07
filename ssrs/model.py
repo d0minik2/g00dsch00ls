@@ -58,7 +58,7 @@ class SchoolRecommendationModel:
             self,
             profiles: list[_profiles.Profile],
             recommendation_attributes=None,
-            mode=RANKING_MODE
+            mode=NORMALIZATION_MODE
     ):
         self.profiles = profiles
         self.mode = mode
@@ -105,7 +105,7 @@ class SchoolRecommendationModel:
 
         self.systems = systems
 
-    def _compare(self, system: r_systems.RecommendationSystem, student: _student.ComparableStudent):
+    def _compare(self, system: r_systems.RecommendationSystem, student: _student.StudentCalculator):
         """Compute recommendation ranking for system"""
 
         recommendation_ranking = system(student)
@@ -116,17 +116,13 @@ class SchoolRecommendationModel:
 
     def recommend(
             self,
-            student: Union[_student.Student, _student.ComparableStudent],
+            student: Union[_student.Student, _student.StudentCalculator],
             n=None
     ) -> list[_profiles.Profile]:
         """Recommends schools for specific student"""
 
         random.shuffle(self.profiles)
         self._init_profiles_df(self.profiles)
-
-        # if Student is not ComparableStudent, convert it to ComparableStudent
-        if not isinstance(student, _student.ComparableStudent) and isinstance(student, _student.Student):
-            student = _student.ComparableStudent.from_existing_student(student)
 
         # for each system in recommendation systems compute ranking
         for system in self.systems:
@@ -135,7 +131,7 @@ class SchoolRecommendationModel:
         # calculate average recommendation score
         self.profiles_df[self.profiles_df.columns[-1]] /= len(self.systems)
 
-        # sort initial indexes by average score
+        # sort initial indexes by recommendation score
         recommendation_ranking = sorted(
             range(len(self.profiles_df)),
             key=lambda profile_idx: self.profiles_df.values[profile_idx][-1]

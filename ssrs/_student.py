@@ -27,7 +27,7 @@ class Student:
 
     exam_results: Union[Dict[str, float], np.ndarray]
     grades: Union[Dict[str, int], np.ndarray]
-    liked_subjects: Union[List, np.ndarray]
+    liked_subjects: Union[List, Dict, np.ndarray]
     location: str = ""
     attributes_preferences: dict = field(default_factory=dict)
     school_type: int = 1  # desired student's school type
@@ -89,23 +89,14 @@ class Student:
         return self._base_points + points_for_subjects
 
 
-class ComparableStudent(Student):
-    """Student, that can be compared to profiles (compare score: less - better)"""
-
-    def __post_init__(self):
-        super(ComparableStudent, self).__post_init__()
-
-        self.options = {
-            "school_type": self.compare_school_type,
-            "mature_scores": self.compare_mature_scores,
-            "extended_subjects": self.compare_extended_subjects,
-            "compare_points": self.compare_points,
-        }
+class StudentCalculator:
+    """Compares student to profiles and calculates the score (compare score: less - better)"""
 
     def __call__(self, *args, **kwargs):
         return self.compare(*args, **kwargs)
 
-    def compare(self, profile: np.ndarray, attr: str) -> float:
+    @staticmethod
+    def compare(student: Student, profile: np.ndarray, attr: str) -> float:
         """Compare student's and profile's attributes
         Returns the score (float value), less - better
 
@@ -118,32 +109,36 @@ class ComparableStudent(Student):
         if isinstance(profile, pd.Series):
             profile = profile.to_numpy()
 
-        result = self.options[attr](profile)
+        result = student_calculator_options[attr](student, profile)
 
         if isinstance(result, tuple):
             return result[0]
 
         return result
 
-    def compare_school_type(self, profile: np.ndarray):
+    @staticmethod
+    def compare_school_type(student: Student, profile: np.ndarray):
         """Compare school type to desired school type of the student, less - better"""
 
-        return abs(self.school_type - profile[0])
+        return abs(student.school_type - profile[0])
 
-    def compare_mature_scores(self, profile: np.ndarray):
+    @staticmethod
+    def compare_mature_scores(student: Student, profile: np.ndarray):
         """Compare mature scores to student's exam results, less - better"""
 
-        return abs(self.exam_results - profile[1]).mean()
+        return abs(student.exam_results - profile[1]).mean()
 
-    def compare_extended_subjects(self, profile: np.ndarray):
+    @staticmethod
+    def compare_extended_subjects(student: Student, profile: np.ndarray):
         """Compare extended subjects to subjects liked by a student, less - better"""
 
-        return 1 / (1 + (self.liked_subjects * profile[2]).sum())
+        return 1 / (1 + (student.liked_subjects * profile[2]).sum())
 
-    def compare_points(self, profile: np.ndarray):
+    @staticmethod
+    def compare_points(student: Student, profile: np.ndarray):
         """Compare student's and profile's points, less - better"""
 
-        points_for_profile = self.calculate_points(profile)
+        points_for_profile = student.calculate_points(profile)
 
         if profile[3][0] > points_for_profile:
             # comparing to minimum profile points
@@ -155,18 +150,10 @@ class ComparableStudent(Student):
 
             return abs(profile[3][1] - points_for_profile)
 
-    @classmethod
-    def from_existing_student(cls, student: Student):
-        """Create comparable student from schools.Student class"""
 
-        assert isinstance(student, Student)
-
-        return cls(
-            exam_results=student.exam_results,
-            grades=student.grades,
-            liked_subjects=student.liked_subjects,
-            location=student.location,
-            attributes_preferences=student.attributes_preferences,
-            school_type=student.school_type,
-            additional_points=student.additional_points,
-        )
+student_calculator_options = {
+    "school_type": StudentCalculator.compare_school_type,
+    "mature_scores": StudentCalculator.compare_mature_scores,
+    "extended_subjects": StudentCalculator.compare_extended_subjects,
+    "compare_points": StudentCalculator.compare_points,
+}
