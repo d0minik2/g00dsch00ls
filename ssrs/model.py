@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+
 from . import _profiles
 from . import _student
 from . import r_systems
@@ -34,7 +35,8 @@ class SchoolRecommendationModel:
     You can use multiple recommendation systems in one model, by using binary numbers to specify which systems to use
     (sum numbers of systems to get system combination). For example, if you want to use both ranking (1) and
     normalization (2) systems, you can use mode 3 (ranking + normalization), if you want to use only ranking system,
-    you can use mode 1 (ranking). Recommendation of multiple systems is done by averaging rankings of each system.
+    you can use mode 1 (ranking). You can also use list or tuple of modes to specify multiple systems.
+    Recommendation of multiple systems is done by averaging rankings of each system.
 
     Two modes are available:
     - RANKING_MODE: (1) recommendations are calculated by comparing student and profile attributes,
@@ -93,15 +95,36 @@ class SchoolRecommendationModel:
             )
         )
 
-    def _init_systems(self, mode: int):
+    def _init_systems(self, mode: Union[int, list, tuple]):
         """Initialize recommendation systems"""
 
-        mode = bin(mode)
-        systems = [
-            MODES[2**i](self)
-            for i, m in enumerate(mode[2:][::-1])
-            if m == "1"
-        ]
+        # create list of recommendation systems based on mode
+        systems = []
+
+        if isinstance(mode, int):
+            # decompose mode into binary numbers and create recommendation systems
+            i = 1
+            while i <= mode:
+                if i & mode:
+                    systems.append(MODES[i](self))
+                i <<= 1
+
+        elif isinstance(mode, list) or isinstance(mode, tuple):
+            # create recommendation systems from list of modes
+
+            if all(isinstance(m, int) for m in mode):
+                # if all modes are integers, create recommendation systems from them
+                systems = []
+                for m in mode:
+                    systems.append(MODES[m](self))
+
+            elif all(issubclass(m, r_systems.RecommendationSystem) for m in mode):
+                # if all modes are recommendation systems, create them
+                systems = [m(self) for m in mode]
+
+        elif issubclass(mode, r_systems.RecommendationSystem):
+            # if mode is recommendation system, create it
+            systems = [mode(self)]
 
         self.systems = systems
 
