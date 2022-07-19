@@ -1,5 +1,3 @@
-"""Config file for SSRS."""
-
 # School properties
 # -----------------
 
