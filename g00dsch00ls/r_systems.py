@@ -16,7 +16,7 @@ class RecommendationSystem:
 
     scores: np.ndarray
 
-    def __init__(self, model: SchoolRecommendationModel):
+    def __init__(self, model: SchoolRecommendationModel, **kwargs):
         self.model = model
         self.scores = np.zeros(len(self.model.profiles))
 
@@ -29,29 +29,32 @@ class RecommendationSystem:
     def recommend(self, student: r_student.Student) -> list[r_profiles.Profile]:
         """Recommends schools for specific student"""
 
-        self.scores = np.zeros(len(self.model.profiles))
-
-        # for each attribute in recommendation sequence compute ranking
-        for attr in self.model.recommendation_attributes:
-            self._compare(attr, student)
-
-        # calculate average recommendation score
-        self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.model.recommendation_attributes.values())
-
-        # sort initial indexes by average score
-        recommendation_ranking = sorted(
-            range(len(self.model.profiles_df)),
-            key=lambda profile_idx: self.scores[profile_idx]
-        )
-
-        return recommendation_ranking
-
 
 
 class RankingSystem(RecommendationSystem):
     """Recommendation System, which recommendations are calculated by comparing student and profile attributes,
         for each attribute computes ranking of best options and combines them into one ranking of best recommendations.
     """
+
+    def __init__(self, model: SchoolRecommendationModel, **kwargs):
+        super().__init__(model, **kwargs)
+
+        recommendation_attributes = kwargs.get(
+            "recommendation_attributes",
+            # if no recommendation attributes are given, use all attributes with weight 1
+            {
+                "mature_scores": 1,
+                "extended_subjects": 1,
+                "compare_points": 1,
+                "school_type": 1
+            }
+        )
+
+        if isinstance(recommendation_attributes, list):
+            # if recommendation attributes are given as list, use all attributes with weight 1
+            recommendation_attributes = {attr: 1 for attr in recommendation_attributes}
+
+        self.recommendation_attributes = recommendation_attributes
 
     def _compare(self, attr: str, student: r_student.Student):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
@@ -67,13 +70,53 @@ class RankingSystem(RecommendationSystem):
         for in_ranking, i in enumerate(recommendation_ranking):
             # add weighted ranking position to the last column of df row (needed to calculate average ranking index)
             self.scores[i] += in_ranking \
-                              * self.model.recommendation_attributes[attr] \
+                              * self.recommendation_attributes[attr] \
                               * student.attributes_preferences.get(attr, 1)
+
+    def recommend(self, student: r_student.Student) -> list[r_profiles.Profile]:
+        """Recommends schools for specific student"""
+
+        self.scores = np.zeros(len(self.model.profiles))
+
+        # for each attribute in recommendation sequence compute ranking
+        for attr in self.recommendation_attributes:
+            self._compare(attr, student)
+
+        # calculate average recommendation score
+        self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
+
+        # sort initial indexes by average score
+        recommendation_ranking = sorted(
+            range(len(self.model.profiles_df)),
+            key=lambda profile_idx: self.scores[profile_idx]
+        )
+
+        return recommendation_ranking
 
 
 class NormalizationSystem(RecommendationSystem):
     """Recommendation System, which recommendations are calculated by comparing student and profile attributes,
         for each attribute computes normalized score and combines them into one recommendation ranking."""
+
+    def __init__(self, model: SchoolRecommendationModel, **kwargs):
+        super().__init__(model, **kwargs)
+
+        recommendation_attributes = kwargs.get(
+            "recommendation_attributes",
+            # if no recommendation attributes are given, use all attributes with weight 1
+            {
+                "mature_scores": 1,
+                "extended_subjects": 1,
+                "compare_points": 1,
+                "school_type": 1
+            }
+        )
+
+        if isinstance(recommendation_attributes, list):
+            # if recommendation attributes are given as list, use all attributes with weight 1
+            recommendation_attributes = {attr: 1 for attr in recommendation_attributes}
+
+        self.recommendation_attributes = recommendation_attributes
 
     def _compare(self, attr: str, student: r_student.Student):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
@@ -86,7 +129,7 @@ class NormalizationSystem(RecommendationSystem):
 
         # add weighted normalized score to the last column of df (needed to calculate average later)
         self.scores += NormalizationSystem.zscore_normalize(compared) \
-                       * self.model.recommendation_attributes[attr] \
+                       * self.recommendation_attributes[attr] \
                        * student.attributes_preferences.get(attr, 1)
 
     @staticmethod
@@ -102,3 +145,24 @@ class NormalizationSystem(RecommendationSystem):
             standard_deviation = (sum_of_differences / (len(values) - 1)) ** .5
 
             return [(value - mean) / standard_deviation for value in values]
+
+    def recommend(self, student: r_student.Student) -> list[r_profiles.Profile]:
+        """Recommends schools for specific student"""
+
+        self.scores = np.zeros(len(self.model.profiles))
+
+        # for each attribute in recommendation sequence compute ranking
+        for attr in self.recommendation_attributes:
+            self._compare(attr, student)
+
+        # calculate average recommendation score
+        self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
+
+        # sort initial indexes by average score
+        recommendation_ranking = sorted(
+            range(len(self.model.profiles_df)),
+            key=lambda profile_idx: self.scores[profile_idx]
+        )
+
+        return recommendation_ranking
+

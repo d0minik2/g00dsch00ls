@@ -48,8 +48,8 @@ class SchoolRecommendationModel:
     ----------
 
     profiles: list of Profile objects to be recommended
-    recommendation_attributes: dict of weights of recommendation attributes (if list, all weights are 1)
-    mode: mode of recommendation system
+    system: mode of recommendation system
+    system_kwargs: dict of arguments for recommendation system
     """
 
     profiles_df: pd.DataFrame
@@ -59,29 +59,17 @@ class SchoolRecommendationModel:
     def __init__(
             self,
             profiles: list[_profiles.Profile],
-            recommendation_attributes=None,
-            mode=NORMALIZATION_MODE
+            system=NORMALIZATION_MODE,
+            system_kwargs=None
     ):
+        if system_kwargs is None:
+            system_kwargs = {}
+
         self.profiles = profiles
-        self.mode = mode
+        self.system = system
 
-        self._init_systems(self.mode)
+        self._init_systems(self.system, system_kwargs)
         self._init_profiles_df(self.profiles)
-
-        if recommendation_attributes is None:
-            # if no recommendation attributes are given, use all attributes with weight 1
-            recommendation_attributes = {
-                "mature_scores": 1,
-                "extended_subjects": 1,
-                "compare_points": 1,
-                "school_type": 1
-            }
-
-        elif isinstance(recommendation_attributes, list):
-            # if recommendation attributes are given as list, use all attributes with weight 1
-            recommendation_attributes = {attr: 1 for attr in recommendation_attributes}
-
-        self.recommendation_attributes = recommendation_attributes
 
     def __call__(self, *args, **kwargs) -> list[_profiles.Profile]:
         return self.recommend(*args, **kwargs)
@@ -95,7 +83,7 @@ class SchoolRecommendationModel:
             )
         )
 
-    def _init_systems(self, mode: Union[int, list, tuple]):
+    def _init_systems(self, mode: Union[int, list, tuple], system_kwargs: dict):
         """Initialize recommendation systems"""
 
         # create list of recommendation systems based on mode
@@ -106,7 +94,7 @@ class SchoolRecommendationModel:
             i = 1
             while i <= mode:
                 if i & mode:
-                    systems.append(MODES[i](self))
+                    systems.append(MODES[i](self, **system_kwargs))
                 i <<= 1
 
         elif isinstance(mode, list) or isinstance(mode, tuple):
@@ -116,15 +104,15 @@ class SchoolRecommendationModel:
                 # if all modes are integers, create recommendation systems from them
                 systems = []
                 for m in mode:
-                    systems.append(MODES[m](self))
+                    systems.append(MODES[m](self, **system_kwargs))
 
             elif all(issubclass(m, r_systems.RecommendationSystem) for m in mode):
                 # if all modes are recommendation systems, create them
-                systems = [m(self) for m in mode]
+                systems = [m(self, **system_kwargs) for m in mode]
 
         elif issubclass(mode, r_systems.RecommendationSystem):
             # if mode is recommendation system, create it
-            systems = [mode(self)]
+            systems = [mode(self, **system_kwargs)]
 
         self.systems = systems
 
