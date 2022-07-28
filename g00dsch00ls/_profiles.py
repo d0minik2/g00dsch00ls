@@ -184,6 +184,7 @@ class Profile:
             )
 
         except KeyError as exc:
+            print(proflie)
             raise type(exc)(
                 f"Profile dict must have the following keys: {list(SCHOOL_DICT_STRUCTURE['profiles'][0].keys())}"
             ) from exc

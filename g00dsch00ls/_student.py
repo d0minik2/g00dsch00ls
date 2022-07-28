@@ -1,7 +1,7 @@
-
 from . import _profiles
 from .config import *
 
+from abc import ABC, abstractmethod
 from typing import Union, Dict, List, Type
 import numpy as np
 import pandas as pd
@@ -9,9 +9,94 @@ from dataclasses import dataclass, field
 
 
 
+class Student(ABC):
+    """Student class
+    Contains student's attributes (data).
+
+    Subclasses usage
+    ----------------
+
+    If you want to use your own type of profiles data and student attributes,
+    create subclass of this class, which contains your own student's
+    parameters. Then, you need to create StudentCalculator subclass that will compare this student class and profiles.
+
+    Example class:
+    class MyStudent(g00dsch00ls.Student):
+        def __init__(
+            self,
+            exam_results: dict
+            grades: dict
+            liked_subjects: list
+        )
+            self.exam_results = exam_results
+            ...
+
+    (Tip: you can use dataclasses)
+    """
+
+
+class StudentCalculator(ABC):
+    """Calculates score for each student attribute.
+    Used in recommendation system to compare student and profile attributes.
+
+    Subclasses usage
+    ----------------
+
+    If you want to use your own student or profile attributes, you need to create a subclass of StudentCalculator
+    (or first create Student subclass, which contains your own student's parameters),
+    which contains your compare functions (used in recommendation system to compare profiles and students).
+
+    To add new comparison method, create a method that starts with "compare_"
+    and takes student and profile as parameters.
+    The method should return a float value, less - better (higher position in ranking).
+
+    Example class:
+    class MyStudentCalculator(g00dsch00ls.StudentCalculator):
+        def compare_school_type(self, student: MyStudent, profile: pandas.Series) -> float:
+            ...
+            return score
+
+    Then the method is contained in self.compare_options dictionary and class can be used in recommendation system.
+    """
+
+    compare_options: dict[str, callable]
+
+    def __init__(self):
+        self.compare_options = {
+            key: func
+            for key, func in self.__class__.__dict__.items()
+            if key.startswith("compare_")
+        }
+
+    def __call__(self, *args, **kwargs):
+        return self.compare(*args, **kwargs)
+
+    def compare(self, student: Student, profile: Union[np.ndarray, pd.Series], attr: str) -> float:
+        """Compare student's and profile's attributes
+        Returns the score (float value), less - better
+
+        Parameters
+        ----------
+        profile: np.ndarray - attributes of the profile
+        attr: str - attribute to compare (must be in self.compare_options)
+        """
+
+        assert attr in self.compare_options, f"Attribute {attr} is not in compare_options. " \
+                                             f"Available attributes: {self.compare_options.keys()}"
+
+        result = self.compare_options[attr](self, student, profile)
+
+        if isinstance(result, tuple):
+            return result[0]
+
+        return result
+
+
+
 @dataclass
-class Student:
+class PLStudent(Student):
     """Student attributes class
+    Contains student's attributes (data) that are used in education system in Poland.
 
     Parameters
     ----------
@@ -20,7 +105,7 @@ class Student:
     liked_subjects: list[str] or dict[str: float] - subjects that student likes
     grades: list[str] or dict[str: float] - grades that student scored
     additional_points: float - additional points that student scored (for achievements, volunteering, etc.)
-    attributes_perferences: dict[str: float] - student's recommendation attributes preferences
+    attributes_prrferences: dict[str: float] - student's recommendation attributes preferences
     location: str - student's address
     school_type: int - student's school type (0 - liceum, 1 - techinkum, 2 - szkoła zawodowa)
     """
@@ -89,53 +174,33 @@ class Student:
         return self._base_points + points_for_subjects
 
 
-class StudentCalculator:
-    """Compares student to profiles and calculates the score (compare score: less - better)"""
+class PLStudentCalculator(StudentCalculator):
+    """Compares student to profiles and calculates the score (compare score: less - better)
+    Student must be a PLStudent object.
+    """
 
-    def __call__(self, *args, **kwargs):
-        return self.compare(*args, **kwargs)
+    def compare(self, student: PLStudent, profile: np.ndarray, attr: str) -> float:
+        assert isinstance(student, PLStudent), \
+            "Student must be a PLStudent object, if you want to use custom Student object, " \
+            "you must use custom StudentCalculator class."
+        return super(PLStudentCalculator, self).compare(student, profile, attr)
 
-    @staticmethod
-    def compare(student: Student, profile: np.ndarray, attr: str) -> float:
-        """Compare student's and profile's attributes
-        Returns the score (float value), less - better
-
-        Parameters
-        ----------
-        profile: np.ndarray - attributes of the profile
-        attr: str - attribute to compare (available: school_type, mature_scores, extended_subjects, compare_points)
-        """
-
-        if isinstance(profile, pd.Series):
-            profile = profile.to_numpy()
-
-        result = student_calculator_options[attr](student, profile)
-
-        if isinstance(result, tuple):
-            return result[0]
-
-        return result
-
-    @staticmethod
-    def compare_school_type(student: Student, profile: np.ndarray):
+    def compare_school_type(self, student: PLStudent, profile: np.ndarray):
         """Compare school type to desired school type of the student, less - better"""
 
         return abs(student.school_type - profile[0])
 
-    @staticmethod
-    def compare_mature_scores(student: Student, profile: np.ndarray):
+    def compare_mature_scores(self, student: PLStudent, profile: np.ndarray):
         """Compare mature scores to student's exam results, less - better"""
 
         return abs(student.exam_results - profile[1]).mean()
 
-    @staticmethod
-    def compare_extended_subjects(student: Student, profile: np.ndarray):
+    def compare_extended_subjects(self, student: PLStudent, profile: np.ndarray):
         """Compare extended subjects to subjects liked by a student, less - better"""
 
         return 1 / (1 + (student.liked_subjects * profile[2]).sum())
 
-    @staticmethod
-    def compare_points(student: Student, profile: np.ndarray):
+    def compare_points(self, student: PLStudent, profile: np.ndarray):
         """Compare student's and profile's points, less - better"""
 
         points_for_profile = student.calculate_points(profile)
@@ -149,11 +214,3 @@ class StudentCalculator:
             # comparing to average profile points
 
             return abs(profile[3][1] - points_for_profile)
-
-
-student_calculator_options = {
-    "school_type": StudentCalculator.compare_school_type,
-    "mature_scores": StudentCalculator.compare_mature_scores,
-    "extended_subjects": StudentCalculator.compare_extended_subjects,
-    "compare_points": StudentCalculator.compare_points,
-}

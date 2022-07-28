@@ -14,18 +14,18 @@ import pandas as pd
 
 
 
-RANKING_MODE = 1
+AVG_RANKING_MODE = 1
 NORMALIZATION_MODE = 2
 
 MODES = {
-    RANKING_MODE: r_systems.RankingSystem,
+    AVG_RANKING_MODE: r_systems.AverageRankingSystem,
     NORMALIZATION_MODE: r_systems.NormalizationSystem
 }
 
 
 
-class SchoolRecommendationModel:
-    """Recommendation System for schools
+class G00dSch00ls:
+    """G00dSch00ls recommendation model for schools
     Calculates school ranking based on student preferences.
     Call that model with student object and number of schools to recommend to get recommended schools.
 
@@ -39,7 +39,7 @@ class SchoolRecommendationModel:
     Recommendation of multiple systems is done by averaging rankings of each system.
 
     Two modes are available:
-    - RANKING_MODE: (1) recommendations are calculated by comparing student and profile attributes,
+    - AVG_RANKING_MODE: (1) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes ranking of best options and combines them into one ranking of best recommendations.
     - NORMALIZATION_MODE: (2) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes normalized score and combines them into one recommendation ranking.
@@ -53,6 +53,7 @@ class SchoolRecommendationModel:
     """
 
     profiles_df: pd.DataFrame
+    scores: np.ndarray
     profiles: list[_profiles.Profile]
     systems: list[r_systems.RecommendationSystem]
 
@@ -78,10 +79,15 @@ class SchoolRecommendationModel:
         # create dataframe with profile attributes and last column for recommendation score
         self.profiles_df = pd.DataFrame.from_dict(
             map(
-                lambda profile: np.append(profile.array, [[0]]),
+                lambda profile: profile.array,
                 profiles
             )
         )
+
+    def _init_scores_array(self):
+        assert not self.profiles_df.empty, "Profiles DF must be initialized first"
+
+        self.scores = np.zeros(len(self.profiles_df))
 
     def _init_systems(self, mode: Union[int, list, tuple], system_kwargs: dict):
         """Initialize recommendation systems"""
@@ -116,36 +122,35 @@ class SchoolRecommendationModel:
 
         self.systems = systems
 
-    def _compare(self, system: r_systems.RecommendationSystem, student: _student.StudentCalculator):
+    def _compare(self, system: r_systems.RecommendationSystem, student: _student.Student):
         """Compute recommendation ranking for system"""
 
         recommendation_ranking = system(student)
 
         for in_ranking, i in enumerate(recommendation_ranking):
             # add ranking position to the last column of df row (needed to calculate average ranking index)
-            self.profiles_df.at[i, self.profiles_df.columns[-1]] += in_ranking
+            self.scores[i] += in_ranking
 
     def recommend(
             self,
-            student: Union[_student.Student, _student.StudentCalculator],
+            student: _student.Student,
             n=None
     ) -> list[_profiles.Profile]:
         """Recommends schools for specific student"""
 
-        random.shuffle(self.profiles)
-        self._init_profiles_df(self.profiles)
+        self._init_scores_array()
 
         # for each system in recommendation systems compute ranking
         for system in self.systems:
             self._compare(system, student)
 
         # calculate average recommendation score
-        self.profiles_df[self.profiles_df.columns[-1]] /= len(self.systems)
+        self.scores /= len(self.systems)
 
         # sort initial indexes by recommendation score
         recommendation_ranking = sorted(
             range(len(self.profiles_df)),
-            key=lambda profile_idx: self.profiles_df.values[profile_idx][-1]
+            key=lambda profile_idx: self.scores[profile_idx]
         )
 
         # yield top n schools
