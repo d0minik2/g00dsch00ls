@@ -80,6 +80,7 @@ class AverageRankingSystem(RecommendationSystem):
     def recommend(self, student: _student.Student) -> list[int]:
         """Recommends schools for specific student"""
 
+        self.student_calculator.check_data_correctness(self.model.profiles_df.iloc[0])
         self.scores = np.zeros(len(self.model.profiles_df))
 
         # for each attribute in recommendation sequence compute ranking
@@ -138,25 +139,6 @@ class NormalizationSystem(RecommendationSystem):
         else:
             raise f"Unknown normalizer {normalizer}"
 
-    def _compare(self, attr: str, student: _student.Student):
-        """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
-
-        # compare student and profile attributes
-        compared = self.model.profiles_df.apply(
-            lambda profile: self.student_calculator.compare(student, profile, attr),
-            axis=1
-        ).to_numpy(dtype=np.float64)
-        compared[np.isnan(compared)] = 1
-
-        student_preference = getattr(student, "attributes_preferences", 1)
-        if student_preference != 1:
-            student_preference = student_preference.get(attr, 1)
-
-        # add weighted normalized score to the last column of df (needed to calculate average later)
-        self.scores += self.normalizer(compared) \
-                       * self.recommendation_attributes[attr] \
-                       * student_preference
-
     @staticmethod
     def linear_scaling_normalize(values: Union[np.ndarray, list]) -> Union[np.ndarray, list]:
         """Normalize values to range 0-1
@@ -189,9 +171,29 @@ class NormalizationSystem(RecommendationSystem):
 
             return [(value - mean) / standard_deviation for value in values]
 
+    def _compare(self, attr: str, student: _student.Student):
+        """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
+
+        # compare student and profile attributes
+        compared = self.model.profiles_df.apply(
+            lambda profile: self.student_calculator.compare(student, profile, attr),
+            axis=1
+        ).to_numpy(dtype=np.float64)
+        compared[np.isnan(compared)] = 1
+
+        student_preference = getattr(student, "attributes_preferences", 1)
+        if student_preference != 1:
+            student_preference = student_preference.get(attr, 1)
+
+        # add weighted normalized score to the last column of df (needed to calculate average later)
+        self.scores += self.normalizer(compared) \
+                       * self.recommendation_attributes[attr] \
+                       * student_preference
+
     def recommend(self, student: _student.Student) -> list[int]:
         """Recommends schools for specific student"""
 
+        self.student_calculator.check_data_correctness(self.model.profiles_df.iloc[0])
         self.scores = np.zeros(len(self.model.profiles_df))
 
         # for each attribute in recommendation sequence compute ranking

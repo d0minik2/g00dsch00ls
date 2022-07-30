@@ -62,12 +62,11 @@ class G00dSch00ls:
         if system_kwargs is None:
             system_kwargs = {}
 
-        assert isinstance(profiles, pd.DataFrame), "Profiles must be pandas DataFrame"
-
         self.profiles_df = profiles
-        self.system = system
+        self._init_systems(system, system_kwargs)
 
-        self._init_systems(self.system, system_kwargs)
+        assert isinstance(self.profiles_df, pd.DataFrame), "Profiles must be pandas DataFrame"
+        assert all(isinstance(s, r_systems.RecommendationSystem) for s in self.systems)
 
     def __call__(self, *args, **kwargs) -> list[pd.Series]:
         return self.recommend(*args, **kwargs)
@@ -85,6 +84,7 @@ class G00dSch00ls:
 
         if isinstance(mode, int):
             # decompose mode into binary numbers and create recommendation systems
+
             i = 1
             while i <= mode:
                 if i & mode:
@@ -93,31 +93,31 @@ class G00dSch00ls:
                 i <<= 1
 
         elif isinstance(mode, list) or isinstance(mode, tuple):
-            # create recommendation systems from list of modes
 
             if all(isinstance(m, int) for m in mode):
-                # if all modes are integers, create recommendation systems from them
+
                 systems = []
                 for m in mode:
                     assert m in MODES, f"Mode {m} is not supported"
                     systems.append(MODES[m](self, **system_kwargs))
 
             elif all(issubclass(m, r_systems.RecommendationSystem) for m in mode):
-                # if all modes are recommendation systems, create them
+
                 systems = [m(self, **system_kwargs) for m in mode]
 
             elif all(isinstance(m, str) for m in mode):
-                # if all modes are strings, create recommendation systems from them
+
                 systems = [MODES[m](self, **system_kwargs) for m in mode]
 
-        elif issubclass(mode, r_systems.RecommendationSystem):
-            # if mode is recommendation system, create it
-            systems = [mode(self, **system_kwargs)]
-
         elif isinstance(mode, str):
-            # if mode is string, create recommendation system from string
+
             assert mode in MODES, f"Mode {mode} is not supported"
             systems = [MODES[mode](self, **system_kwargs)]
+
+        elif isinstance(mode, type):
+            if issubclass(mode, r_systems.RecommendationSystem):
+
+                systems = [mode(self, **system_kwargs)]
 
         assert systems, "No recommendation systems specified"
 
@@ -139,6 +139,9 @@ class G00dSch00ls:
     ) -> list[pd.Series]:
         """Recommends schools for specific student"""
 
+        assert isinstance(student, _student.Student), "Student must be _student.Student object"
+        assert isinstance(n, int) or n is None, "n must be int or None"
+
         self._init_scores_array()
 
         # for each system in recommendation systems compute ranking
@@ -151,7 +154,7 @@ class G00dSch00ls:
         # sort initial indexes by recommendation score
         recommendation_ranking = sorted(
             range(len(self.profiles_df)),
-            key=lambda profile_idx: self.scores[profile_idx]
+            key=lambda profile_idx: self.scores[profile_idx],
         )
 
         # yield top n schools

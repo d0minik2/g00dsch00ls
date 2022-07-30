@@ -90,6 +90,11 @@ class StudentCalculator(ABC):
 
         return result
 
+    def check_data_correctness(self, profile: pd.Series, _assert=True) -> bool:
+        """Check if profile data is correct"""
+
+        return True
+
 
 
 @dataclass
@@ -112,8 +117,8 @@ class PLStudent(Student):
     exam_results: Union[Dict[str, float], np.ndarray]
     grades: Union[Dict[str, int], np.ndarray]
     liked_subjects: Union[List, Dict, np.ndarray]
-    location: str = ""
     attributes_preferences: dict = field(default_factory=dict)
+    location: str = ""
     school_type: int = 1  # desired student's school type
     additional_points: int = 0  # points for achievements, volunteering, etc.
     _base_points = 0
@@ -176,14 +181,45 @@ class PLStudent(Student):
 
 class PLStudentCalculator(StudentCalculator):
     """Compares student to profiles and calculates the score (compare score: less - better)
+
     Student must be a PLStudent object.
+
+    Profile must be a pandas.Series object and must contain the following attributes:
+    - subjects: list[str] - list of extended subjects
+    - scored_subjects: list[str] - subjects that are scored by the profile
+    - school_type: int - school type (0 - liceum, 1 - techinkum, 2 - szkoła zawodowa)
+    - matura_polish: float - Polish matura score
+    - matura_math: float - Math matura score
+    - matura_english: float - English matura score
+    - min_points: float - minimum points
+    - avg_points: float - average points
     """
 
     def compare(self, student: PLStudent, profile: pd.Series, attr: str) -> float:
         assert isinstance(student, PLStudent), \
             "Student must be a PLStudent object, if you want to use custom Student object, " \
             "you must use custom StudentCalculator class."
+
         return super(PLStudentCalculator, self).compare(student, profile, attr)
+
+    def check_data_correctness(self, profile: pd.Series, _assert=True) -> bool:
+        correct = all((
+            profile.get("school_type") is not None,
+            profile.get("matura_polish") is not None,
+            profile.get("matura_math") is not None,
+            profile.get("matura_english") is not None,
+            profile.get("subjects") is not None,
+            profile.get("scored_subjects") is not None,
+            profile.get("min_points") is not None,
+            profile.get("avg_points") is not None
+        ))
+
+        if _assert:
+            assert correct, "Profile must contain the following attributes: " \
+                             "school_type, matura_polish, matura_math, matura_english, subjects, " \
+                             "scored_subjects, min_points, avg_points"
+
+        return correct
 
     def compare_school_type(self, student: PLStudent, profile: pd.Series):
         """Compare school type to desired school type of the student, less - better"""
@@ -207,7 +243,7 @@ class PLStudentCalculator(StudentCalculator):
             if subj in profile["subjects"]:
                 subjects_sum += val
                 continue
-            subjects_sum -= .2
+            subjects_sum -= .5
 
         return 1 / max(subjects_sum, 1e-5)
 
