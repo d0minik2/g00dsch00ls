@@ -1,8 +1,3 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-
-
-from . import _profiles
 from . import _student
 from . import r_systems
 
@@ -54,35 +49,26 @@ class G00dSch00ls:
 
     profiles_df: pd.DataFrame
     scores: np.ndarray
-    profiles: list[_profiles.Profile]
     systems: list[r_systems.RecommendationSystem]
 
     def __init__(
             self,
-            profiles: list[_profiles.Profile],
-            system=NORMALIZATION_MODE,
+            profiles: pd.DataFrame,
+            system=AVG_RANKING_MODE,
             system_kwargs=None
     ):
         if system_kwargs is None:
             system_kwargs = {}
 
-        self.profiles = profiles
+        assert isinstance(profiles, pd.DataFrame), "Profiles must be pandas DataFrame"
+
+        self.profiles_df = profiles
         self.system = system
 
         self._init_systems(self.system, system_kwargs)
-        self._init_profiles_df(self.profiles)
 
-    def __call__(self, *args, **kwargs) -> list[_profiles.Profile]:
+    def __call__(self, *args, **kwargs) -> list[pd.Series]:
         return self.recommend(*args, **kwargs)
-
-    def _init_profiles_df(self, profiles: list[_profiles.Profile]):
-        # create dataframe with profile attributes and last column for recommendation score
-        self.profiles_df = pd.DataFrame.from_dict(
-            map(
-                lambda profile: profile.array,
-                profiles
-            )
-        )
 
     def _init_scores_array(self):
         assert not self.profiles_df.empty, "Profiles DF must be initialized first"
@@ -100,6 +86,7 @@ class G00dSch00ls:
             i = 1
             while i <= mode:
                 if i & mode:
+                    assert i in MODES, f"Mode {i} is not supported"
                     systems.append(MODES[i](self, **system_kwargs))
                 i <<= 1
 
@@ -110,6 +97,7 @@ class G00dSch00ls:
                 # if all modes are integers, create recommendation systems from them
                 systems = []
                 for m in mode:
+                    assert m in MODES, f"Mode {m} is not supported"
                     systems.append(MODES[m](self, **system_kwargs))
 
             elif all(issubclass(m, r_systems.RecommendationSystem) for m in mode):
@@ -119,6 +107,8 @@ class G00dSch00ls:
         elif issubclass(mode, r_systems.RecommendationSystem):
             # if mode is recommendation system, create it
             systems = [mode(self, **system_kwargs)]
+
+        assert systems, "No recommendation systems specified"
 
         self.systems = systems
 
@@ -135,7 +125,7 @@ class G00dSch00ls:
             self,
             student: _student.Student,
             n=None
-    ) -> list[_profiles.Profile]:
+    ) -> list[pd.Series]:
         """Recommends schools for specific student"""
 
         self._init_scores_array()
@@ -155,4 +145,16 @@ class G00dSch00ls:
 
         # yield top n schools
         for i in recommendation_ranking[:n]:
-            yield self.profiles[i]
+            yield self.profiles_df.iloc[i]
+
+    @classmethod
+    def from_csv(
+            cls,
+            csv_path: str,
+            *args, **kwargs
+    ) -> 'G00dSch00ls':
+        """Create G00dSch00ls model from CSV file"""
+
+        profiles_df = pd.read_csv(csv_path)
+
+        return cls(profiles_df, *args, **kwargs)

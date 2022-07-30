@@ -1,4 +1,3 @@
-from . import _profiles
 from .config import *
 
 from abc import ABC, abstractmethod
@@ -118,19 +117,12 @@ class PLStudent(Student):
     school_type: int = 1  # desired student's school type
     additional_points: int = 0  # points for achievements, volunteering, etc.
     _base_points = 0
-    _subject_points = np.array([])
 
     def __post_init__(self):
-        # mapping subjects to arrays
-        self.liked_subjects = _profiles.map_subjects(self.liked_subjects)
-        self.grades = _profiles.map_subjects(self.grades)
         self._calculate_base_points()
 
         if not isinstance(self.exam_results, np.ndarray):
             self.exam_results = np.array(list(self.exam_results.values()))
-
-        # calculating points for grades that will be used when calculating points for profiles
-        self._subject_points = np.vectorize(_profiles.calculate_grade_points)(self.grades)
 
         # TODO set location to jakdojade object (if i get an API access)
 
@@ -138,7 +130,11 @@ class PLStudent(Student):
         """Calculating base points, that cannot change depending on the profile"""
 
         # adding DIPLOMA_HONORS_POINTS if GPA is greater or equal than required GPA
-        if self.grades[MIN_GRADE <= self.grades].mean() >= DIPLOMA_HONORS_GPA:
+        grades = self.grades
+        zachowanie = 5
+        if grades.get("zachowanie") is not None:
+            zachowanie = grades.pop("zachowanie")
+        if sum(grades.values()) / sum(v > 0 for v in grades.values()) >= DIPLOMA_HONORS_GPA and zachowanie >= 5:
             self._base_points += DIPLOMA_HONORS_POINTS
 
         if isinstance(self.exam_results, dict):
@@ -157,21 +153,25 @@ class PLStudent(Student):
 
         self._base_points += self.additional_points
 
-    def calculate_points(self, profile) -> float:
+    def calculate_points(self, profile: pd.Series) -> float:
         """Calculating points for given profile"""
+
+        assert isinstance(profile, pd.Series), "Profile must be a pandas.Series"
 
         points_for_subjects = 0
 
-        if isinstance(profile, np.ndarray):
-            assert profile[4].size == len(SUBJECTS), \
-                ValueError("The scored grades attribute should be at index 4 of the array")
-
-            points_for_subjects = (profile[4] * self._subject_points).sum()
-
-        elif isinstance(profile, _profiles.Profile):
-            points_for_subjects = (profile.scored_subjects * self._subject_points).sum()
+        for subject, grade in self.grades.items():
+            if profile["scored_subjects"] is not np.NaN:
+                if subject in profile["scored_subjects"]:
+                    points_for_subjects += PLStudent.calculate_grade_points(grade)
 
         return self._base_points + points_for_subjects
+
+    @staticmethod
+    def calculate_grade_points(grade: int, scores=POINTS_FOR_GRADES) -> int:
+        """Calculating points for grades"""
+
+        return scores[int(grade)]
 
 
 class PLStudentCalculator(StudentCalculator):
@@ -179,38 +179,49 @@ class PLStudentCalculator(StudentCalculator):
     Student must be a PLStudent object.
     """
 
-    def compare(self, student: PLStudent, profile: np.ndarray, attr: str) -> float:
+    def compare(self, student: PLStudent, profile: pd.Series, attr: str) -> float:
         assert isinstance(student, PLStudent), \
             "Student must be a PLStudent object, if you want to use custom Student object, " \
             "you must use custom StudentCalculator class."
         return super(PLStudentCalculator, self).compare(student, profile, attr)
 
-    def compare_school_type(self, student: PLStudent, profile: np.ndarray):
+    def compare_school_type(self, student: PLStudent, profile: pd.Series):
         """Compare school type to desired school type of the student, less - better"""
 
-        return abs(student.school_type - profile[0])
+        return abs(student.school_type - profile["school_type"])
 
-    def compare_mature_scores(self, student: PLStudent, profile: np.ndarray):
+    def compare_mature_scores(self, student: PLStudent, profile: pd.Series):
         """Compare mature scores to student's exam results, less - better"""
 
-        return abs(student.exam_results - profile[1]).mean()
+        return abs(
+            student.exam_results - np.array(
+                [profile["matura_polish"], profile["matura_math"], profile["matura_english"]]
+            )
+        ).mean()
 
-    def compare_extended_subjects(self, student: PLStudent, profile: np.ndarray):
+    def compare_extended_subjects(self, student: PLStudent, profile: pd.Series):
         """Compare extended subjects to subjects liked by a student, less - better"""
 
-        return 1 / (1 + (student.liked_subjects * profile[2]).sum())
+        subjects_sum = 0
+        for subj, val in student.liked_subjects.items():
+            if subj in profile["subjects"]:
+                subjects_sum += val
+                continue
+            subjects_sum -= .2
 
-    def compare_points(self, student: PLStudent, profile: np.ndarray):
+        return 1 / max(subjects_sum, 1e-5)
+
+    def compare_points(self, student: PLStudent, profile: pd.Series):
         """Compare student's and profile's points, less - better"""
 
         points_for_profile = student.calculate_points(profile)
-
-        if profile[3][0] > points_for_profile:
+        print(points_for_profile, profile["min_points"])
+        if profile["min_points"] > points_for_profile:
             # comparing to minimum profile points
 
-            return abs(profile[3][0] - points_for_profile),
+            return abs(profile["min_points"] - points_for_profile),
 
         else:
             # comparing to average profile points
 
-            return abs(profile[3][1] - points_for_profile)
+            return abs(profile["avg_points"] - points_for_profile) * .8

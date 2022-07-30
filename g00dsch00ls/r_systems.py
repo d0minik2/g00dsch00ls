@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from . import _profiles
 from . import _student
 
 from abc import ABC, abstractmethod
@@ -19,18 +18,19 @@ class RecommendationSystem(ABC):
 
     def __init__(self, model: model.G00dSch00ls, **kwargs):
         self.model = model
-        self.scores = np.zeros(len(self.model.profiles))
+        self.scores = np.zeros(len(self.model.profiles_df))
 
     def __call__(self, *args, **kwargs):
         return self.recommend(*args, **kwargs)
 
     @abstractmethod
-    def _compare(self, student: _student.Student):
-        """Compute recommendation scores for specific student"""
+    def _compare(self, student: _student.Student, *args, **kwargs) -> None:
+        """Compute recommendation scores for specific student or attribute (adds result to self.scores)"""
 
     @abstractmethod
-    def recommend(self, student: _student.Student) -> list[_profiles.Profile]:
-        """Recommends schools for specific student"""
+    def recommend(self, student: _student.Student) -> list[int]:
+        """Recommends schools for specific student,
+        returns list of indices, where indices are sorted by recommendation score"""
 
 
 
@@ -63,9 +63,10 @@ class AverageRankingSystem(RecommendationSystem):
         recommendation_ranking = sorted(
             list(range(len(self.model.profiles_df))),
             key=lambda profile_idx: self.student_calculator.compare(
-                student, self.model.profiles_df.values[profile_idx], attr
+                student, self.model.profiles_df.iloc[profile_idx], attr
             )
         )
+        print(attr, recommendation_ranking)
 
         student_preference = getattr(student, "attributes_preferences", 1)
         if student_preference != 1:
@@ -77,10 +78,10 @@ class AverageRankingSystem(RecommendationSystem):
                               * self.recommendation_attributes[attr] \
                               * student_preference
 
-    def recommend(self, student: _student.Student) -> list[_profiles.Profile]:
+    def recommend(self, student: _student.Student) -> list[int]:
         """Recommends schools for specific student"""
 
-        self.scores = np.zeros(len(self.model.profiles))
+        self.scores = np.zeros(len(self.model.profiles_df))
 
         # for each attribute in recommendation sequence compute ranking
         for attr in self.recommendation_attributes:
@@ -127,6 +128,7 @@ class NormalizationSystem(RecommendationSystem):
             lambda profile: self.student_calculator.compare(student, profile, attr),
             axis=1
         ).to_numpy(dtype=np.float64)
+        compared[np.isnan(compared)] = 1
 
         student_preference = getattr(student, "attributes_preferences", 1)
         if student_preference != 1:
@@ -151,10 +153,10 @@ class NormalizationSystem(RecommendationSystem):
 
             return [(value - mean) / standard_deviation for value in values]
 
-    def recommend(self, student: _student.Student) -> list[_profiles.Profile]:
+    def recommend(self, student: _student.Student) -> list[int]:
         """Recommends schools for specific student"""
 
-        self.scores = np.zeros(len(self.model.profiles))
+        self.scores = np.zeros(len(self.model.profiles_df))
 
         # for each attribute in recommendation sequence compute ranking
         for attr in self.recommendation_attributes:
