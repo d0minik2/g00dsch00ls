@@ -14,7 +14,9 @@ NORMALIZATION_MODE = 2
 
 MODES = {
     AVG_RANKING_MODE: r_systems.AverageRankingSystem,
-    NORMALIZATION_MODE: r_systems.NormalizationSystem
+    NORMALIZATION_MODE: r_systems.NormalizationSystem,
+    "avg_ranking": r_systems.AverageRankingSystem,
+    "normalization": r_systems.NormalizationSystem
 }
 
 
@@ -104,9 +106,18 @@ class G00dSch00ls:
                 # if all modes are recommendation systems, create them
                 systems = [m(self, **system_kwargs) for m in mode]
 
+            elif all(isinstance(m, str) for m in mode):
+                # if all modes are strings, create recommendation systems from them
+                systems = [MODES[m](self, **system_kwargs) for m in mode]
+
         elif issubclass(mode, r_systems.RecommendationSystem):
             # if mode is recommendation system, create it
             systems = [mode(self, **system_kwargs)]
+
+        elif isinstance(mode, str):
+            # if mode is string, create recommendation system from string
+            assert mode in MODES, f"Mode {mode} is not supported"
+            systems = [MODES[mode](self, **system_kwargs)]
 
         assert systems, "No recommendation systems specified"
 

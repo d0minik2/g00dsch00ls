@@ -215,7 +215,7 @@ class PLStudentCalculator(StudentCalculator):
         """Compare student's and profile's points, less - better"""
 
         points_for_profile = student.calculate_points(profile)
-        print(points_for_profile, profile["min_points"])
+
         if profile["min_points"] > points_for_profile:
             # comparing to minimum profile points
 

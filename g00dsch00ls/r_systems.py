@@ -66,7 +66,6 @@ class AverageRankingSystem(RecommendationSystem):
                 student, self.model.profiles_df.iloc[profile_idx], attr
             )
         )
-        print(attr, recommendation_ranking)
 
         student_preference = getattr(student, "attributes_preferences", 1)
         if student_preference != 1:
@@ -106,6 +105,8 @@ class NormalizationSystem(RecommendationSystem):
     def __init__(self, model: model.G00dSch00ls, **kwargs):
         super().__init__(model, **kwargs)
 
+        self._init_normalizer(kwargs.get("normalizer", NormalizationSystem.zscore_normalize))
+
         self.student_calculator = kwargs.get("student_calculator", _student.PLStudentCalculator)()
 
         recommendation_attributes = kwargs.get(
@@ -119,6 +120,23 @@ class NormalizationSystem(RecommendationSystem):
             recommendation_attributes = {attr: 1 for attr in recommendation_attributes}
 
         self.recommendation_attributes = recommendation_attributes
+
+    def _init_normalizer(self, normalizer: Union[callable, str]):
+        """Initialize normalizer function"""
+
+        if isinstance(normalizer, str):
+            if normalizer == "z-score":
+                self.normalizer = NormalizationSystem.zscore_normalize
+            elif normalizer == "linear_scaling":
+                self.normalizer = NormalizationSystem.linear_scaling_normalize
+            else:
+                raise f"Unknown normalizer {normalizer}"
+
+        if callable(normalizer):
+            self.normalizer = normalizer
+
+        else:
+            raise f"Unknown normalizer {normalizer}"
 
     def _compare(self, attr: str, student: _student.Student):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
@@ -135,13 +153,31 @@ class NormalizationSystem(RecommendationSystem):
             student_preference = student_preference.get(attr, 1)
 
         # add weighted normalized score to the last column of df (needed to calculate average later)
-        self.scores += NormalizationSystem.zscore_normalize(compared) \
+        self.scores += self.normalizer(compared) \
                        * self.recommendation_attributes[attr] \
                        * student_preference
 
     @staticmethod
+    def linear_scaling_normalize(values: Union[np.ndarray, list]) -> Union[np.ndarray, list]:
+        """Normalize values to range 0-1
+                x′ = (x − x[m i n]) / (x[m a x] − x[m i n])
+        """
+
+        if isinstance(values, np.ndarray):
+            return (values - np.min(values)) / (np.max(values) - np.min(values))
+
+        if isinstance(values, list):
+            _max = max(values)
+            _min = min(values)
+
+            return [(value - _min) / (_max - _min) for value in values]
+
+    @staticmethod
     def zscore_normalize(values: Union[List, np.ndarray]) -> Union[List, np.ndarray]:
-        """Normalize values to z-score."""
+        """Normalize values to z-score
+
+                x′ = (x − x[m i n]) / σ
+        """
 
         if isinstance(values, np.ndarray):
             return (values - values.mean()) / np.std(values)
