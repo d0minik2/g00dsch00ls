@@ -1,12 +1,15 @@
 <h1 align="center">g00dsch00ls</h1>
-Recommendation system for secondary schools in Poland.
 
-## Table of contents
-* [Installation](#installation)
-* [Usage](#usage)
 
-## Installation
-```
+<p align="center">
+    Recommendation system for secondary schools in Poland. <br> <br>
+    <a href="#installation"> Installation </a> | <a href="#usage"> Usage </a>
+</p> 
+<br>
+
+<h2 align="center">Installation</h2>
+
+```console
 # clone the repository
 git clone https://github.com/d0minik2/g00dsch00ls.git
 
@@ -17,10 +20,13 @@ cd g00dsch00ls
 python -m pip install -e .
 ```
 
-## Usage
+<br>
+
+<h2 align="center">Usage</h2>
 
 
-### Usage with data compatible with the Polish education system.
+<h3 align="center">Usage with data compatible with the Polish education system</h3>
+
 Data must have the following columns:
 * subjects: list[str]
 * school_type: int
@@ -76,7 +82,7 @@ for i in recommendations:
     print(i)
 ```
 
-### Usage with your custom data
+<h3 align="center">Usage with your custom data</h3>
 
 You have to write your own Student and StudentCalculator class to use your custom data.
 
