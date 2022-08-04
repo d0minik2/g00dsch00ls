@@ -9,12 +9,12 @@ import pandas as pd
 
 
 
-AVG_RANKING_MODE = 1
-NORMALIZATION_MODE = 2
+AVG_RANKING_SYSTEM = 1
+NORMALIZATION_SYSTEM = 2
 
-MODES = {
-    AVG_RANKING_MODE: r_systems.AverageRankingSystem,
-    NORMALIZATION_MODE: r_systems.NormalizationSystem,
+SYSTEMS = {
+    AVG_RANKING_SYSTEM: r_systems.AverageRankingSystem,
+    NORMALIZATION_SYSTEM: r_systems.NormalizationSystem,
     "avg_ranking": r_systems.AverageRankingSystem,
     "normalization": r_systems.NormalizationSystem
 }
@@ -35,17 +35,18 @@ class G00dSch00ls:
     you can use mode 1 (ranking). You can also use list or tuple of modes to specify multiple systems.
     Recommendation of multiple systems is done by averaging rankings of each system.
 
-    Two modes are available:
-    - AVG_RANKING_MODE: (1) recommendations are calculated by comparing student and profile attributes,
+    Two systems are available:
+    - AVG_RANKING_SYSTEM: (1) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes ranking of best options and combines them into one ranking of best recommendations.
-    - NORMALIZATION_MODE: (2) recommendations are calculated by comparing student and profile attributes,
+    - NORMALIZATION_SYSTEM: (2) recommendations are calculated by comparing student and profile attributes,
         for each attribute computes normalized score and combines them into one recommendation ranking.
 
     Parameters
     ----------
 
     profiles: list of Profile objects to be recommended
-    system: mode of recommendation system
+    system: int or list[int] or str or list[str] or RecommendationSystem or list[RecommendationSystem]
+            - recommendation system(s)
     system_kwargs: dict of arguments for recommendation system
     """
 
@@ -56,7 +57,7 @@ class G00dSch00ls:
     def __init__(
             self,
             profiles: pd.DataFrame,
-            system=AVG_RANKING_MODE,
+            system=AVG_RANKING_SYSTEM,
             system_kwargs=None
     ):
         if system_kwargs is None:
@@ -76,48 +77,48 @@ class G00dSch00ls:
 
         self.scores = np.zeros(len(self.profiles_df))
 
-    def _init_systems(self, mode: Union[int, list, tuple], system_kwargs: dict):
+    def _init_systems(self, system: Union[int, str, list, tuple, r_systems.RecommendationSystem], system_kwargs: dict):
         """Initialize recommendation systems"""
 
         # create list of recommendation systems based on mode
         systems = []
 
-        if isinstance(mode, int):
+        if isinstance(system, int):
             # decompose mode into binary numbers and create recommendation systems
 
             i = 1
-            while i <= mode:
-                if i & mode:
-                    assert i in MODES, f"Mode {i} is not supported"
-                    systems.append(MODES[i](self, **system_kwargs))
+            while i <= system:
+                if i & system:
+                    assert i in SYSTEMS, f"System {i} is not supported"
+                    systems.append(SYSTEMS[i](self, **system_kwargs))
                 i <<= 1
 
-        elif isinstance(mode, list) or isinstance(mode, tuple):
+        elif isinstance(system, list) or isinstance(system, tuple):
 
-            if all(isinstance(m, int) for m in mode):
+            if all(isinstance(s, int) for s in system):
 
                 systems = []
-                for m in mode:
-                    assert m in MODES, f"Mode {m} is not supported"
-                    systems.append(MODES[m](self, **system_kwargs))
+                for s in system:
+                    assert s in SYSTEMS, f"System {s} is not supported"
+                    systems.append(SYSTEMS[s](self, **system_kwargs))
 
-            elif all(issubclass(m, r_systems.RecommendationSystem) for m in mode):
+            elif all(issubclass(s, r_systems.RecommendationSystem) for s in system):
 
-                systems = [m(self, **system_kwargs) for m in mode]
+                systems = [s(self, **system_kwargs) for s in system]
 
-            elif all(isinstance(m, str) for m in mode):
+            elif all(isinstance(s, str) for s in system):
 
-                systems = [MODES[m](self, **system_kwargs) for m in mode]
+                systems = [SYSTEMS[s](self, **system_kwargs) for s in system]
 
-        elif isinstance(mode, str):
+        elif isinstance(system, str):
 
-            assert mode in MODES, f"Mode {mode} is not supported"
-            systems = [MODES[mode](self, **system_kwargs)]
+            assert system in SYSTEMS, f"System {system} is not supported"
+            systems = [SYSTEMS[system](self, **system_kwargs)]
 
-        elif isinstance(mode, type):
-            if issubclass(mode, r_systems.RecommendationSystem):
+        elif isinstance(system, type):
+            if issubclass(system, r_systems.RecommendationSystem):
 
-                systems = [mode(self, **system_kwargs)]
+                systems = [system(self, **system_kwargs)]
 
         assert systems, "No recommendation systems specified"
 

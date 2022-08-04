@@ -1,4 +1,4 @@
-from .model import G00dSch00ls, AVG_RANKING_MODE, NORMALIZATION_MODE
+from .model import G00dSch00ls, AVG_RANKING_SYSTEM, NORMALIZATION_SYSTEM
 from ._student import StudentCalculator, Student, PLStudent, PLStudentCalculator
 from .r_systems import RecommendationSystem, AverageRankingSystem, NormalizationSystem
 
@@ -9,8 +9,8 @@ __all__ = [
     "Student",
     "PLStudent",
     "PLStudentCalculator",
-    "AVG_RANKING_MODE",
-    "NORMALIZATION_MODE",
+    "AVG_RANKING_SYSTEM",
+    "NORMALIZATION_SYSTEM",
     "RecommendationSystem",
     "AverageRankingSystem",
     "NormalizationSystem"

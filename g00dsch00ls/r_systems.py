@@ -60,12 +60,10 @@ class AverageRankingSystem(RecommendationSystem):
         """Compute recommendation ranking for specific attribute (attribute from recommendation sequence)"""
 
         # calculate ranking of schools for specific attribute
-        recommendation_ranking = sorted(
-            list(range(len(self.model.profiles_df))),
-            key=lambda profile_idx: self.student_calculator.compare(
-                student, self.model.profiles_df.iloc[profile_idx], attr
-            )
-        )
+        recommendation_ranking = sorted(list(range(len(self.model.profiles_df))),
+                                        key=lambda profile_idx: self.student_calculator.compare(
+                                            student, self.model.profiles_df.iloc[profile_idx], attr
+                                        ))
 
         student_preference = getattr(student, "attributes_preferences", 1)
         if student_preference != 1:
@@ -91,10 +89,8 @@ class AverageRankingSystem(RecommendationSystem):
         self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
 
         # sort initial indexes by average score
-        recommendation_ranking = sorted(
-            range(len(self.model.profiles_df)),
-            key=lambda profile_idx: self.scores[profile_idx]
-        )
+        recommendation_ranking = sorted(range(len(self.model.profiles_df)),
+                                        key=lambda profile_idx: self.scores[profile_idx])
 
         return recommendation_ranking
 
@@ -204,10 +200,8 @@ class NormalizationSystem(RecommendationSystem):
         self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
 
         # sort initial indexes by average score
-        recommendation_ranking = sorted(
-            range(len(self.model.profiles_df)),
-            key=lambda profile_idx: self.scores[profile_idx]
-        )
+        recommendation_ranking = sorted(range(len(self.model.profiles_df)),
+                                        key=lambda profile_idx: self.scores[profile_idx])
 
         return recommendation_ranking
 

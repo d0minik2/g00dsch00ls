@@ -64,8 +64,10 @@ class StudentCalculator(ABC):
         self.compare_options = {
             key: func
             for key, func in self.__class__.__dict__.items()
-            if key.startswith("compare_")
+            if key.startswith("compare_") and callable(func)
         }
+
+        assert len(self.compare_options) > 0, "No compare functions found"
 
     def __call__(self, *args, **kwargs):
         return self.compare(*args, **kwargs)
@@ -238,12 +240,11 @@ class PLStudentCalculator(StudentCalculator):
     def compare_extended_subjects(self, student: PLStudent, profile: pd.Series):
         """Compare extended subjects to subjects liked by a student, less - better"""
 
-        subjects_sum = 0
-        for subj, val in student.liked_subjects.items():
-            if subj in profile["subjects"]:
-                subjects_sum += val
-                continue
-            subjects_sum -= .5
+        subjects_sum = sum(
+            val
+            for subj, val in student.liked_subjects.items()
+            if subj in profile["subjects"]
+        )
 
         return 1 / max(subjects_sum, 1e-5)
 
@@ -255,9 +256,12 @@ class PLStudentCalculator(StudentCalculator):
         if profile["min_points"] > points_for_profile:
             # comparing to minimum profile points
 
-            return abs(profile["min_points"] - points_for_profile),
+            return abs(profile["min_points"] - points_for_profile)
 
         else:
             # comparing to average profile points
 
-            return abs(profile["avg_points"] - points_for_profile) * .8
+            return min(
+                abs(profile["min_points"] - points_for_profile),
+                abs(profile["avg_points"] - points_for_profile) * .8
+            )
