@@ -82,10 +82,11 @@ def test_model_normalization_system():
                                         "compare_extended_subjects": 0, "compare_points": 0
                                     }, "normalizer": g00dsch00ls.NormalizationSystem.linear_scaling_normalize})
 
-    recommendations = model(student)
+    n = 2
+    recommendations = model(student, n=n)
 
     assert isinstance(recommendations, list)
-    assert len(recommendations) == data.shape[0]
+    assert len(recommendations) == n
     assert all(isinstance(i, pd.Series) for i in recommendations)
 
     # system should compare school type only so the first recommendation should have preferred school type
@@ -113,3 +114,28 @@ def test_model_multiple_systems():
     # system should compare school type only so the first recommendation should have preferred school type
     assert recommendations[0]["school_type"] == round(student.school_type)
 
+
+def test_custom_data():
+    data = pd.read_csv("data/example_data.csv")
+
+    class ExampleStudent(g00dsch00ls.Student):
+        def __init__(self, exam_result: int):
+            self.exam_result = exam_result
+
+    class ExampleStudentCalculator(g00dsch00ls.StudentCalculator):
+        def compare_exam_result(self, student: ExampleStudent, profile: pd.Series) -> float:
+            if profile["required_exam_result"] < student.exam_result:
+                return 0.0
+
+            return 1.0
+
+    student = ExampleStudent(exam_result=45)
+
+    model = g00dsch00ls.G00dSch00ls(data, system_kwargs={
+                                    "student_calculator": ExampleStudentCalculator})
+
+    recommendations = model(student)
+
+    assert isinstance(recommendations, list)
+    assert all(isinstance(i, pd.Series) for i in recommendations)
+    assert len(recommendations) == data.shape[0]
