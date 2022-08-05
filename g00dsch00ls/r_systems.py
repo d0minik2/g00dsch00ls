@@ -86,7 +86,7 @@ class AverageRankingSystem(RecommendationSystem):
             self._compare(attr, student)
 
         # calculate average recommendation score
-        self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
+        self.scores /= sum(self.recommendation_attributes.values())
 
         # sort initial indexes by average score
         recommendation_ranking = sorted(range(len(self.model.profiles_df)),
@@ -197,7 +197,7 @@ class NormalizationSystem(RecommendationSystem):
             self._compare(attr, student)
 
         # calculate average recommendation score
-        self.model.profiles_df[self.model.profiles_df.columns[-1]] /= sum(self.recommendation_attributes.values())
+        self.scores /= sum(self.recommendation_attributes.values())
 
         # sort initial indexes by average score
         recommendation_ranking = sorted(range(len(self.model.profiles_df)),

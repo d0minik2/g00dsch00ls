@@ -158,9 +158,8 @@ class G00dSch00ls:
             key=lambda profile_idx: self.scores[profile_idx],
         )
 
-        # yield top n schools
-        for i in recommendation_ranking[:n]:
-            yield self.profiles_df.iloc[i]
+        return [self.profiles_df.iloc[i] for i in recommendation_ranking[:n]]
+
 
     @classmethod
     def from_csv(
