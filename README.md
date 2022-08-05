@@ -29,6 +29,7 @@ python -m pip install -e .
 
 Data must have the following columns:
 * subjects: list[str]
+* scored_subjects: list[str]
 * school_type: int
 * matura_polish: float
 * matura_math: float
@@ -138,7 +139,8 @@ student = ExampleStudent(
 model = g00dsch00ls.G00dSch00ls(
     data,
     system_kwargs={
-        "student_calculator": ExampleStudentCalculator,  # add your student calculator class to system_kwargs
+        # add your student calculator class to system_kwargs
+        "student_calculator": ExampleStudentCalculator,
     }
 )
 
