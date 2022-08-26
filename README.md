@@ -19,6 +19,12 @@ cd g00dsch00ls
 # install the package using pip
 python -m pip install -e .
 ```
+#### or
+```console
+# install by pip directly from github
+pip install git+https://github.com/d0minik2/g00dsch00ls.git
+```
+
 
 <br>
 
